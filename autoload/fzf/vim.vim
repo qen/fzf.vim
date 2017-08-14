@@ -581,12 +581,6 @@ endfunction
 function! fzf#vim#filelist(name, list, ...)
   let [query, args] = (a:0 && type(a:1) == type('')) ? [a:1, a:000[1:]] : ['', a:000]
 
-  " echo a:0
-  " echo a:1
-  " echo a:000
-  " echo query
-  " echo args
-
   return s:fzf(a:name, {
   \ 'source':  a:list,
   \ 'sink*':   s:function('s:filebufopen'),
