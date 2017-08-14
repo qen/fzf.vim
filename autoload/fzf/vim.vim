@@ -590,6 +590,7 @@ endfunction
 
 function! fzf#vim#filesuggest(...)
   let path_files = globpath(expand('%:h'), '**/*', 0, 1)
+  " let cwd_files = globpath(getcwd(), '**/*'.expand('%:e'), 0, 1)
   let bufs = map(sort(s:buflisted(), 's:sort_buffers'), 's:format_buffer(v:val)')
   let list = reverse(bufs)
   let bufstr = join(bufs, ' ')
@@ -602,6 +603,21 @@ function! fzf#vim#filesuggest(...)
   endfor
 
   return call(function('fzf#vim#filelist'), [ 'filesuggest', list ] + a:000)
+endfunction
+
+function! fzf#vim#filefolders(...)
+  let list = [ expand('%') ]
+
+  for folder in a:000
+    for file in globpath(folder, '**/*', 0, 1)
+      let f = fnamemodify(file, ':.')
+      if !isdirectory(file) && filereadable(file)
+        call add(list, f)
+      endif
+    endfor
+  endfor
+
+  return call(function('fzf#vim#filelist'), [ 'filesuggest', list ])
 endfunction
 
 " ------------------------------------------------------------------
