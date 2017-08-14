@@ -581,6 +581,12 @@ endfunction
 function! fzf#vim#filelist(name, list, ...)
   let [query, args] = (a:0 && type(a:1) == type('')) ? [a:1, a:000[1:]] : ['', a:000]
 
+  " echo a:0
+  " echo a:1
+  " echo a:000
+  " echo query
+  " echo args
+
   return s:fzf(a:name, {
   \ 'source':  a:list,
   \ 'sink*':   s:function('s:filebufopen'),
@@ -605,10 +611,10 @@ function! fzf#vim#filesuggest(...)
   return call(function('fzf#vim#filelist'), [ 'filesuggest', list ] + a:000)
 endfunction
 
-function! fzf#vim#filefolders(...)
+function! fzf#vim#filefolders(folders, ...)
   let list = [ expand('%') ]
 
-  for folder in a:000
+  for folder in a:folders
     for file in globpath(folder, '**/*', 0, 1)
       let f = fnamemodify(file, ':.')
       if !isdirectory(file) && filereadable(file)
@@ -617,7 +623,7 @@ function! fzf#vim#filefolders(...)
     endfor
   endfor
 
-  return call(function('fzf#vim#filelist'), [ 'filesuggest', list ])
+  return call(function('fzf#vim#filelist'), [ 'filfolders', list ] + a:000)
 endfunction
 
 " ------------------------------------------------------------------
