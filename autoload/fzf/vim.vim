@@ -556,7 +556,7 @@ function! s:filebufopen(file)
   if len(a:file) < 2
     return
   endif
-  let b = matchstr(a:file[1], '\[\zs[0-9]*\ze\]')
+  let b = matchstr(a:file[1], '\[\zs[0-9\-\+]*\ze\]')
   if empty(a:file[0]) && get(g:, 'fzf_buffers_jump')
     let [t, w] = s:find_open_window(b)
     if t
@@ -570,12 +570,21 @@ function! s:filebufopen(file)
     execute 'silent' cmd
   endif
 
+  if b == '-'
+    execute 'edit '. split(a:file[1], "\t")[-1:][0]
+    return
+  endif
+
+  if b == '+'
+    " echo split(a:file[1], "\t")[-1:][0]
+    return call(function('fzf#vim#filefolders'), [ split(a:file[1], "\t")[-1:]  ] )
+  endif
+
   if !empty(b)
     execute 'buffer' b
     return
   endif
 
-  execute 'edit ' a:file[1]
 endfunction
 
 function! fzf#vim#filelist(name, list, ...)
@@ -589,20 +598,33 @@ function! fzf#vim#filelist(name, list, ...)
 endfunction
 
 function! fzf#vim#filesuggest(...)
-  let path_files = globpath(expand('%:h'), '**/*', 0, 1)
-  " let cwd_files = globpath(getcwd(), '**/*'.expand('%:e'), 0, 1)
-  let bufs = map(sort(s:buflisted(), 's:sort_buffers'), 's:format_buffer(v:val)')
-  let list = reverse(bufs)
-  let bufstr = join(bufs, ' ')
+  let path = expand('%:h')
+  " if path is current working directory
+  if path == '.'
+    " do not recurse into directory
+    let path_files = globpath(path, '*', 0, 1)
+  else
+    " recursive look into files
+    let path_files = filter(globpath(path, '**/*', 0, 1), '!isdirectory(v:val)')
+  endif
+
+  let bufs    = map(sort(s:buflisted(), 's:sort_buffers'), 's:format_buffer(v:val)')
+  let list    = reverse(bufs)
+  let blist   = map(s:buflisted(), 'bufname(v:val)')
+  let folders = []
 
   for file in path_files
     let f = fnamemodify(file, ':.')
-    if !isdirectory(file) && filereadable(file) && !(bufstr =~ f)
-      call add(list, f)
+    if isdirectory(file)
+      call add(folders, s:strip(printf("[%s] %s\t%s\t%s", "+", "", s:blue(f), "")))
+    else
+      if filereadable(file) && index(blist, f) == -1
+        call add(list, s:strip(printf("[%s] %s\t%s\t%s", '-', '', f, '')))
+      endif
     endif
   endfor
 
-  return call(function('fzf#vim#filelist'), [ 'filesuggest', list ] + a:000)
+  return call(function('fzf#vim#filelist'), [ 'filesuggest', list + folders ] + a:000)
 endfunction
 
 function! fzf#vim#filefolders(folders, ...)
@@ -612,7 +634,7 @@ function! fzf#vim#filefolders(folders, ...)
     for file in globpath(folder, '**/*', 0, 1)
       let f = fnamemodify(file, ':.')
       if !isdirectory(file) && filereadable(file)
-        call add(list, f)
+        call add(list, s:strip(printf("[%s] %s\t%s\t%s", '-', '', f, '')))
       endif
     endfor
   endfor
