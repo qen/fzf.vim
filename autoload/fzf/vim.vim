@@ -542,11 +542,66 @@ function! fzf#vim#buffers(...)
 
   let [query, args] = (a:0 && type(a:1) == type('')) ?
         \ [a:1, a:000[1:]] : ['', a:000]
+
   return s:fzf('buffers', {
   \ 'source':  reverse(bufs),
   \ 'sink*':   s:function('s:bufopen'),
   \ 'options': '+m -x --tiebreak=index --header-lines=1 --ansi -d "\t" -n 2,1..2 --prompt="Buf> "'.s:q(query)
   \}, args)
+endfunction
+
+function! s:filebufopen(file)
+  " if lines is a valid file, open that file
+
+  if len(a:file) < 2
+    return
+  endif
+  let b = matchstr(a:file[1], '\[\zs[0-9]*\ze\]')
+  if empty(a:file[0]) && get(g:, 'fzf_buffers_jump')
+    let [t, w] = s:find_open_window(b)
+    if t
+      call s:jump(t, w)
+      return
+    endif
+  endif
+
+  let cmd = get(get(g:, 'fzf_action', s:default_action), a:file[0], '')
+  if !empty(cmd)
+    execute 'silent' cmd
+  endif
+
+  if !empty(b)
+    execute 'buffer' b
+    return
+  endif
+
+  execute 'edit ' a:file[1]
+endfunction
+
+function! fzf#vim#filelist(name, list, ...)
+  let [query, args] = (a:0 && type(a:1) == type('')) ? [a:1, a:000[1:]] : ['', a:000]
+
+  return s:fzf(a:name, {
+  \ 'source':  a:list,
+  \ 'sink*':   s:function('s:filebufopen'),
+  \ 'options': '+m -x --tiebreak=index --header-lines=1 --ansi -d "\t" -n 2,1..2 --prompt="Buf> "'.s:q(query)
+  \}, args)
+endfunction
+
+function! fzf#vim#filesuggest(...)
+  let path_files = globpath(expand('%:h'), '**/*', 0, 1)
+  let bufs = map(sort(s:buflisted(), 's:sort_buffers'), 's:format_buffer(v:val)')
+  let list = reverse(bufs)
+  let bufstr = join(bufs, ' ')
+
+  for file in path_files
+    let f = fnamemodify(file, ':.')
+    if !isdirectory(file) && filereadable(file) && !(bufstr =~ f)
+      call add(list, f)
+    endif
+  endfor
+
+  return call(function('fzf#vim#filelist'), [ 'filesuggest', list ] + a:000)
 endfunction
 
 " ------------------------------------------------------------------
