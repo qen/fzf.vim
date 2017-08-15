@@ -598,19 +598,19 @@ function! fzf#vim#filelist(name, list, ...)
 endfunction
 
 function! fzf#vim#filesuggest(...)
-  let path = expand('%:h')
+  let path = empty(expand('%:h')) ? '.' : expand('%:h')
   " if path is current working directory
   if path == '.'
     " do not recurse into directory
     let path_files = globpath(path, '*', 0, 1)
   else
-    " recursive look into files
+    " recursive look into directory files
     let path_files = filter(globpath(path, '**/*', 0, 1), '!isdirectory(v:val)')
   endif
 
+  let blist   = map(s:buflisted(), 'bufname(v:val)')
   let bufs    = map(sort(s:buflisted(), 's:sort_buffers'), 's:format_buffer(v:val)')
   let list    = reverse(bufs)
-  let blist   = map(s:buflisted(), 'bufname(v:val)')
   let folders = []
 
   for file in path_files
@@ -639,7 +639,7 @@ function! fzf#vim#filefolders(folders, ...)
     endfor
   endfor
 
-  return call(function('fzf#vim#filelist'), [ 'filfolders', list ] + a:000)
+  return call(function('fzf#vim#filelist'), [ 'filefolders', list ] + a:000)
 endfunction
 
 " ------------------------------------------------------------------
