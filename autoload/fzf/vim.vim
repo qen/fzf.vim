@@ -556,7 +556,7 @@ function! s:filebufopen(file)
   if len(a:file) < 2
     return
   endif
-  let b = matchstr(a:file[1], '\[\zs[0-9\-\+]*\ze\]')
+  let b = matchstr(a:file[1], '\[\zs[0-9\~\+\|\#\%]*\ze\]')
   if empty(a:file[0]) && get(g:, 'fzf_buffers_jump')
     let [t, w] = s:find_open_window(b)
     if t
@@ -570,14 +570,15 @@ function! s:filebufopen(file)
     execute 'silent' cmd
   endif
 
-  if b == '-'
-    execute 'edit '. split(a:file[1], "\t")[-1:][0]
-    return
-  endif
-
   if b == '+'
     " echo split(a:file[1], "\t")[-1:][0]
     return call(function('fzf#vim#filefolders'), [ split(a:file[1], "\t")[-1:]  ] )
+  endif
+
+  if b == '~' || b == '%'
+    let path = b == '%' ? expand('%:h').'/' : ''
+    execute 'edit '. path.split(a:file[1], "\t")[-1:][0]
+    return
   endif
 
   if !empty(b)
@@ -585,6 +586,17 @@ function! s:filebufopen(file)
     return
   endif
 
+endfunction
+
+function! s:format_filelist(file)
+  let cdir = expand('%:h')
+  let b = '~'
+  let f = fnamemodify(a:file, ':.')
+  if fnamemodify(a:file, ':h') =~ cdir
+    let b = '%'
+    let f = substitute(a:file, cdir.'/', '', 'g')
+  endif
+  return s:strip(printf("[%s] %s\t%s\t%s", b, '', f, ''))
 endfunction
 
 function! fzf#vim#filelist(name, list, ...)
@@ -619,7 +631,7 @@ function! fzf#vim#filesuggest(...)
       call add(folders, s:strip(printf("[%s] %s\t%s\t%s", "+", "", s:blue(f), "")))
     else
       if filereadable(file) && index(blist, f) == -1
-        call add(list, s:strip(printf("[%s] %s\t%s\t%s", '-', '', f, '')))
+        call add(list, s:format_filelist(file))
       endif
     endif
   endfor
@@ -628,13 +640,12 @@ function! fzf#vim#filesuggest(...)
 endfunction
 
 function! fzf#vim#filefolders(folders, ...)
-  let list = [ expand('%') ]
+  let list = [ expand('%:h') ]
 
   for folder in a:folders
     for file in globpath(folder, '**/*', 0, 1)
-      let f = fnamemodify(file, ':.')
       if !isdirectory(file) && filereadable(file)
-        call add(list, s:strip(printf("[%s] %s\t%s\t%s", '-', '', f, '')))
+        call add(list, s:format_filelist(file))
       endif
     endfor
   endfor
