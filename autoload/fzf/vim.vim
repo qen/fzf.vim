@@ -572,7 +572,10 @@ function! s:filebufopen(file)
 
   if b == '+'
     " echo split(a:file[1], "\t")[-1:][0]
-    return call(function('fzf#vim#filefolders'), [ split(a:file[1], "\t")[-1:]  ] )
+    " return call(function('fzf#vim#filefolders'), [ split(a:file[1], "\t")[-1:]  ] )
+    " call(feedkeys('a'))
+    execute 'call fzf#vim#filefolders(["'. split(a:file[1], "\t")[-1:][0] .'"])'
+    return
   endif
 
   if b == '~' || b == '%'
@@ -588,13 +591,15 @@ function! s:filebufopen(file)
 
 endfunction
 
-function! s:format_filelist(file)
+function! s:format_filelist(file, rel)
   let cdir = expand('%:h')
   let b = '~'
   let f = fnamemodify(a:file, ':.')
   if fnamemodify(a:file, ':h') =~ cdir
     let b = '%'
-    let f = substitute(a:file, cdir.'/', '', 'g')
+    if a:rel == 1
+      let f = substitute(a:file, cdir.'/', '', 'g')
+    endif
   endif
   return s:strip(printf("[%s] %s\t%s\t%s", b, '', f, ''))
 endfunction
@@ -611,14 +616,10 @@ endfunction
 
 function! fzf#vim#filesuggest(...)
   let path = empty(expand('%:h')) ? '.' : expand('%:h')
-  " if path is current working directory
-  if path == '.'
-    " do not recurse into directory
-    let path_files = globpath(path, '*', 0, 1)
-  else
-    " recursive look into directory files
-    let path_files = filter(globpath(path, '**/*', 0, 1), '!isdirectory(v:val)')
-  endif
+  let s    = system( "du -sLk ".shellescape(path)." | awk '{print $1}'" )
+
+  " folder size that is greater than 20mb, if less than 20mb look recursively
+  let path_files = s >= 20000 ? globpath(path, '*', 0, 1) : filter(globpath(path, '**/*', 0, 1), '!isdirectory(v:val)')
 
   let blist   = map(s:buflisted(), 'bufname(v:val)')
   let bufs    = map(sort(s:buflisted(), 's:sort_buffers'), 's:format_buffer(v:val)')
@@ -631,7 +632,7 @@ function! fzf#vim#filesuggest(...)
       call add(folders, s:strip(printf("[%s] %s\t%s\t%s", "+", "", s:blue(f), "")))
     else
       if filereadable(file) && index(blist, f) == -1
-        call add(list, s:format_filelist(file))
+        call add(list, s:format_filelist(file, 1))
       endif
     endif
   endfor
@@ -640,17 +641,27 @@ function! fzf#vim#filesuggest(...)
 endfunction
 
 function! fzf#vim#filefolders(folders, ...)
-  let list = [ expand('%:h') ]
+  let list    = [ expand('%:h') ]
+  let folders = []
 
   for folder in a:folders
-    for file in globpath(folder, '**/*', 0, 1)
-      if !isdirectory(file) && filereadable(file)
-        call add(list, s:format_filelist(file))
+    let s = system( "du -sLk ".shellescape(folder)." | awk '{print $1}'" )
+    " folder size that is greater than 20mb, if less than 20mb look recursively
+    let p = s >= 20000 ? '*' : '**/*'
+
+    for file in globpath(folder, p, 0, 1)
+      let f = fnamemodify(file, ':.')
+      if isdirectory(file)
+        call add(folders, s:strip(printf("[%s] %s\t%s\t%s", "+", "", s:blue(f), "")))
+      else
+        if filereadable(file)
+          call add(list, s:format_filelist(file, 1))
+        endif
       endif
     endfor
   endfor
 
-  return call(function('fzf#vim#filelist'), [ 'filefolders', list ] + a:000)
+  return call(function('fzf#vim#filelist'), [ 'filefolders', list + folders ] + a:000)
 endfunction
 
 " ------------------------------------------------------------------
