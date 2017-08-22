@@ -571,9 +571,6 @@ function! s:filebufopen(file)
   endif
 
   if b == '+'
-    " echo split(a:file[1], "\t")[-1:][0]
-    " return call(function('fzf#vim#filefolders'), [ split(a:file[1], "\t")[-1:]  ] )
-    " call(feedkeys('a'))
     execute 'call fzf#vim#filefolders(["'. split(a:file[1], "\t")[-1:][0] .'"])'
     return
   endif
@@ -595,11 +592,9 @@ function! s:format_filelist(file, rel)
   let cdir = expand('%:h')
   let b = '~'
   let f = fnamemodify(a:file, ':.')
-  if fnamemodify(a:file, ':h') =~ cdir
+  if fnamemodify(a:file, ':h') =~ cdir && a:rel == 1
     let b = '%'
-    if a:rel == 1
-      let f = substitute(a:file, cdir.'/', '', 'g')
-    endif
+    let f = substitute(a:file, cdir.'/', '', 'g')
   endif
   return s:strip(printf("[%s] %s\t%s\t%s", b, '', f, ''))
 endfunction
@@ -647,15 +642,15 @@ function! fzf#vim#filefolders(folders, ...)
   for folder in a:folders
     let s = system( "du -sLk ".shellescape(folder)." | awk '{print $1}'" )
     " folder size that is greater than 20mb, if less than 20mb look recursively
-    let p = s >= 20000 ? '*' : '**/*'
+    let entries = s >= 20000 ? globpath(folder, '*', 0, 1) : filter(globpath(folder, '**/*', 0, 1), '!isdirectory(v:val)')
 
-    for file in globpath(folder, p, 0, 1)
+    for file in entries
       let f = fnamemodify(file, ':.')
       if isdirectory(file)
         call add(folders, s:strip(printf("[%s] %s\t%s\t%s", "+", "", s:blue(f), "")))
       else
         if filereadable(file)
-          call add(list, s:format_filelist(file, 1))
+          call add(list, s:format_filelist(file, 0))
         endif
       endif
     endfor
