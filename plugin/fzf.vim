@@ -21,6 +21,17 @@
 " OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 " WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+if !exists('g:projectdirsizes')
+  let g:projectdirsizes = {}
+endif
+
+if exists('g:projectdirectories') && len(g:projectdirectories) != 0
+  for line in systemlist( 'du -sLk '.(join(g:projectdirectories, ' ')) )
+    let value = split(line, '\t')
+    let g:projectdirsizes[value[1]] = value[0]
+  endfor
+endif
+
 let s:cpo_save = &cpo
 set cpo&vim
 
