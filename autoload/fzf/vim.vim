@@ -599,36 +599,15 @@ function! s:format_filelist(file, rel)
   return s:strip(printf("[%s] %s\t%s\t%s", b, '', f, ''))
 endfunction
 
-function! fzf#vim#filelist(name, list, ...)
-  let [query, args] = (a:0 && type(a:1) == type('')) ? [a:1, a:000[1:]] : ['', a:000]
-
-  return s:fzf(a:name, {
-  \ 'source':  a:list,
-  \ 'sink*':   s:function('s:filebufopen'),
-  \ 'options': '+m -x --tiebreak=index --header-lines=1 --ansi -d "\t" -n 2,1..2 --prompt="> "'.s:q(query)
-  \}, args)
-endfunction
-
-" let s:duhash = {}
-" function! s:dulist(path)
-"   if hash_key(s:duhash, path)
-"     let size = get(s:duhash, path, 0)
-"   endif
-"
-"   let size = get
-"   return size
-" endfunction
-
 function! fzf#vim#filesuggest(...)
   let path = empty(expand('%:h')) ? '.' : expand('%:h')
-  " let s    = system( "du -sLk ".shellescape(path)." | awk '{print $1}'" )
   " folder size that is greater than 20mb, if less than 20mb look recursively
   " let path_files = s >= 20000 ? globpath(path, '*', 0, 1) : filter(globpath(path, '**/*', 0, 1), '!isdirectory(v:val)')
   let path_files = ( path == '.' || path =~ '^/' ) ? globpath(path, '*', 0, 1) : filter(globpath(path, '**/*', 0, 1), '!isdirectory(v:val)')
 
   let blist   = map(s:buflisted(), 'bufname(v:val)')
-  let bufs    = map(sort(s:buflisted(), 's:sort_buffers'), 's:format_buffer(v:val)')
-  let list    = reverse(bufs)
+  let bufs    = reverse( map(sort(s:buflisted(), 's:sort_buffers'), 's:format_buffer(v:val)') )
+  let list    = []
   let folders = []
 
   for file in path_files
@@ -642,12 +621,19 @@ function! fzf#vim#filesuggest(...)
     endif
   endfor
 
-  return call(function('fzf#vim#filelist'), [ 'filesuggest', list + folders ] + a:000)
+  let prompt = expand('%:h') == '.' ? s:shortpath() : expand('%:h').'/'
+
+  return s:fzf('filesuggest', {
+  \ 'source':  ( list + bufs + folders ),
+  \ 'sink*':   s:function('s:filebufopen'),
+  \ 'options': '+m -x --tiebreak=index --ansi -d "\t" -n 2,1..2 --prompt="'.prompt.'"'
+  \}, a:000)
 endfunction
 
 function! fzf#vim#filefolders(files, folders, ...)
   let list    = [ expand('%:h') ]
   let folders = []
+  let [query, args] = (a:0 && type(a:1) == type('')) ? [a:1, a:000[1:]] : ['', a:000]
 
   if !empty(a:files)
     for file in filter(a:files, 'filereadable(v:val)')
@@ -668,27 +654,12 @@ function! fzf#vim#filefolders(files, folders, ...)
 
   endif
 
-  " let entries = systemlist("ag -g '' ".join( vfolders, ' ' ))
-  " for file in entries
-  "   let f = fnamemodify(file, ':.')
-  "   if isdirectory(file)
-  "     call add(folders, s:strip(printf("[%s] %s\t%s\t%s", "+", "", s:blue(f), "")))
-  "   else
-  "     if filereadable(file)
-  "       call add(list, s:format_filelist(file, 0))
-  "     endif
-  "   endif
-  " endfor
-
   if len(vfolders) != 0
 
     for folder in vfolders
       " folder size that is greater than 20mb, if less than 20mb look recursively
       let entries = g:projectdirsizes[folder] >= 20000 ? systemlist("ag -g '' -n ".folder) : systemlist("ag -g '' ".folder)
 
-      " let entries = g:projectdirsizes[folder] >= 20000 ? globpath(folder, '*', 0, 1) : filter(globpath(folder, '**/*', 0, 1), '!isdirectory(v:val)')
-      " let entries = globpath(folder, '*', 0, 1)
-      " let entries = filter(globpath(folder, '**/*', 0, 1), '!isdirectory(v:val)')
       for file in entries
         let f = fnamemodify(file, ':.')
         if isdirectory(file)
@@ -703,7 +674,13 @@ function! fzf#vim#filefolders(files, folders, ...)
 
   endif
 
-  return call(function('fzf#vim#filelist'), [ 'filefolders', list + folders ] + a:000)
+  let prompt = s:shortpath()
+
+  return s:fzf('filefolders', {
+  \ 'source':  ( list + folders ),
+  \ 'sink*':   s:function('s:filebufopen'),
+  \ 'options': '+m -x --tiebreak=index --ansi -d "\t" -n 2,1..2 --prompt="'.prompt.'"'.s:q(query)
+  \}, args)
 endfunction
 
 " ------------------------------------------------------------------
